@@ -11,9 +11,26 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
 find_package(FFmpeg REQUIRED)
 
-add_executable(direct-to-video
+add_library(direct-to-video
     # Source files
-    src/main.cpp
+    src/frame.cpp
+    src/frame_queue.cpp
+    src/encoder.cpp
+
+    # Include files
+    include/frame.h
+    include/ffmpeg.h
+    include/frame_queue.h
+    include/encoder.h
+    include/dtv.h
+)
+
+add_executable(direct-to-video-demo
+    # Source files
+    demo/src/main.cpp
+
+    # Include files
+    include/dtv.h
 )
 
 target_include_directories(direct-to-video PUBLIC
@@ -22,3 +39,15 @@ target_include_directories(direct-to-video PUBLIC
     ${AVUTIL_INCLUDE_DIR}
     ${AVDEVICE_INCLUDE_DIR}
 )
+
+target_link_libraries(direct-to-video PUBLIC
+    ${AVCODEC_LIBRARY}
+    ${AVFORMAT_LIBRARY}
+    ${AVUTIL_LIBRARY}
+    ${AVDEVICE_LIBRARY}
+    ${SWSCALE_LIBRARY}
+    ${SWRESAMPLE_LIBRARY}
+)
+
+target_link_libraries(direct-to-video-demo
+    direct-to-video)
