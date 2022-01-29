@@ -10,9 +10,14 @@ namespace atg_dtv {
     class Encoder {
         public:
             struct VideoSettings {
-                std::string fname;
-                int width;
-                int height;
+                std::string fname = "";
+                bool hardwareEncoding = true;
+                int width = 1920;
+                int height = 1080;
+                int inputWidth = 1920;
+                int inputHeight = 1080;
+                int frameRate = 60;
+                int bitRate = 30000000;
             };
 
             enum class Error {
@@ -40,11 +45,12 @@ namespace atg_dtv {
             Encoder();
             ~Encoder();
 
-            FrameQueue *run(VideoSettings &settings, int bufferSize);
+            void run(VideoSettings &settings, int bufferSize);
             void commit();
             void stop();
             Frame *newFrame(bool wait = false);
             void submitFrame();
+            Error getError();
 
         protected:
             void worker();

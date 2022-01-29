@@ -1,22 +1,57 @@
 #include "../include/dtv.h"
 
+#include <iostream>
+#include <chrono>
+#include <cmath>
+
 int main() {
     atg_dtv::Encoder encoder;
     atg_dtv::Encoder::VideoSettings settings{};
-    settings.fname = "test.mp4";
-    settings.width = 1920;
-    settings.height = 1080;
 
-    atg_dtv::FrameQueue *q = encoder.run(settings, 16);
-    
-    for (int i = 0; i < 120; ++i) {
-        atg_dtv::Frame *f = encoder.newFrame(true);
-        
-        for (int y = 0; y < 1080; ++y) {
-            for (int x = 0; x < 1920; ++x) {
-                f->m_rgb[(y * 1920 + x) * 3 + 0] = x % 255;
-                f->m_rgb[(y * 1920 + x) * 3 + 1] = y % 255;
-                f->m_rgb[(y * 1920 + x) * 3 + 2] = i % 255;
+    // Output filename
+    settings.fname = "direct_to_video_sample_output.mp4";
+
+    // Input dimensions
+    settings.inputWidth = 2560;
+    settings.inputHeight = 1440;
+
+    // Output dimensions
+    settings.width = 2560;
+    settings.height = 1440;
+
+    // Encoder settings
+    settings.hardwareEncoding = true;
+    settings.bitRate = 16000000;
+
+    const int VideoLengthSeconds = 60;
+    const int FrameCount = VideoLengthSeconds * settings.frameRate;
+
+    auto start = std::chrono::steady_clock::now();
+
+    std::cout << "==============================================\n";
+    std::cout << " Direct to Video (DTV) Sample Application\n\n";
+
+    encoder.run(settings, 2);
+
+    for (int i = 0; i < FrameCount; ++i) {
+        if ((i + 1) % 100 == 0 || i >= FrameCount - 10) {
+            std::cout << "Frame: " << (i + 1) << "/" << FrameCount << "\n";
+        }
+
+        const int sin_i = std::lroundf(255 * (0.5 + 0.5 * std::sin(i * 0.01)));
+
+        atg_dtv::Frame *frame = encoder.newFrame(true);
+        if (frame == nullptr) break;
+        if (encoder.getError() != atg_dtv::Encoder::Error::None) break;
+
+        const int lineWidth = settings.inputWidth * 3;
+        for (int y = 0; y < settings.inputHeight; ++y) {
+            uint8_t *row = &frame->m_rgb[y * lineWidth];
+            for (int x = 0; x < settings.inputWidth; ++x) {
+                const int index = x * 3;
+                row[index + 0] = (x + i) & 0xFF; // r
+                row[index + 1] = (y + i) & 0xFF; // g
+                row[index + 2] = sin_i & 0xFF;   // b
             }
         }
 
@@ -25,4 +60,18 @@ int main() {
 
     encoder.commit();
     encoder.stop();
+
+    auto end = std::chrono::steady_clock::now();
+
+    const double elapsedSeconds =
+        std::chrono::duration<double>(end - start).count();
+
+    std::cout << "==============================================\n";
+    if (encoder.getError() == atg_dtv::Encoder::Error::None) {      
+        std::cout << "Encoding took: " << elapsedSeconds << " seconds" << "\n";
+        std::cout << "Real-time framerate: " << FrameCount / elapsedSeconds << " FPS" << "\n";
+    }
+    else {
+        std::cout << "Encoding failed\n";
+    }
 }

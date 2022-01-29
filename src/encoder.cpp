@@ -1,27 +1,37 @@
+#include "..\include\encoder.h"
 #include "../include/encoder.h"
 
 #include "../include/ffmpeg.h"
 
 atg_dtv::Encoder::Encoder() {
-    m_stopped = false;
+    m_stopped = true;
+    m_error = Error::None;
+    m_worker = nullptr;
 }
 
 atg_dtv::Encoder::~Encoder() {
     /* void */
 }
 
-atg_dtv::FrameQueue *atg_dtv::Encoder::run(
+void atg_dtv::Encoder::run(
         VideoSettings &settings,
         int bufferSize)
 {
+    std::lock_guard<std::mutex> lk(m_lock);
+    if (!m_stopped) return;
+
     m_videoSettings = settings;
     m_stopped = false;
+    m_error = Error::None;
 
     m_queue.initialize(bufferSize);
 
     m_worker = new std::thread(&atg_dtv::Encoder::worker, this);
+}
 
-    return &m_queue;
+atg_dtv::Encoder::Error atg_dtv::Encoder::getError() {
+    std::lock_guard<std::mutex> lk(m_lock);
+    return m_error;
 }
 
 void atg_dtv::Encoder::commit() {
@@ -35,11 +45,15 @@ void atg_dtv::Encoder::commit() {
 
 void atg_dtv::Encoder::stop() {
     m_worker->join();
+
     delete m_worker;
+    m_worker = nullptr;
+
+    m_queue.destroy();
 }
 
 atg_dtv::Frame *atg_dtv::Encoder::newFrame(bool wait) {
-    return m_queue.newFrame(m_videoSettings.width, m_videoSettings.height, wait);
+    return m_queue.newFrame(m_videoSettings.inputWidth, m_videoSettings.inputHeight, wait);
 }
 
 void atg_dtv::Encoder::submitFrame() {
@@ -54,8 +68,6 @@ struct OutputStream {
 
     AVFrame *frame = nullptr, *tempFrame = nullptr;
     AVPacket *tempPacket = nullptr;
-
-    float t, tincr, tincr2;
 
     SwsContext *swsContext = nullptr;
     SwrContext *swrContext = nullptr;
@@ -72,7 +84,15 @@ atg_dtv::Encoder::Error addStream(
 
     AVCodecContext *codecContext;
 
-    *codec = avcodec_find_encoder(codecId);
+    *codec = nullptr;
+    if (settings.hardwareEncoding) {
+        *codec = avcodec_find_encoder_by_name("h264_nvenc");
+    }
+
+    if (*codec == nullptr) {
+        *codec = avcodec_find_encoder(codecId);
+    }
+
     if (*codec == nullptr) {
         return Error::CouldNotFindEncoder;
     }
@@ -96,16 +116,21 @@ atg_dtv::Encoder::Error addStream(
 
     ost->codecContext = codecContext;
 
+    if (strcmp((*codec)->name, "libx264") == 0) {
+        av_opt_set(ost->codecContext->priv_data, "preset", "ultrafast", 0);
+        av_opt_set(ost->codecContext->priv_data, "tune", "zerolatency", 0);
+    }
+
     switch ((*codec)->type) {
         case AVMEDIA_TYPE_AUDIO:
             return Error::UnsupportedMediaType;
         case AVMEDIA_TYPE_VIDEO:
             codecContext->codec_id = codecId;
-            codecContext->bit_rate = 16000000;
+            codecContext->bit_rate = settings.bitRate;
             codecContext->width = settings.width;
             codecContext->height = settings.height;
 
-            ost->av_stream->time_base = { 1, 60 };
+            ost->av_stream->time_base = { 1, settings.frameRate };
             codecContext->time_base = ost->av_stream->time_base;
 
             codecContext->gop_size = 12;
@@ -120,6 +145,10 @@ atg_dtv::Encoder::Error addStream(
             break;
         default:
             return Error::UnsupportedMediaType;
+    }
+
+    if ((oc->oformat->flags & AVFMT_GLOBALHEADER) > 0) {
+        ost->codecContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     }
 
     return Error::None;
@@ -156,7 +185,8 @@ AVFrame *allocateFrame(
 atg_dtv::Encoder::Error openVideo(
         AVFormatContext *oc,
         const AVCodec *codec,
-        OutputStream *ost)
+        OutputStream *ost,
+        atg_dtv::Encoder::VideoSettings &settings)
 {
     typedef atg_dtv::Encoder::Error Error;
 
@@ -173,15 +203,13 @@ atg_dtv::Encoder::Error openVideo(
         return Error::CouldNotAllocateFrame;
     }
 
-    if (ost->codecContext->pix_fmt != AV_PIX_FMT_RGBA) {
-        ost->tempFrame = allocateFrame(
-                AV_PIX_FMT_RGBA,
-                ost->codecContext->width,
-                ost->codecContext->height);
+    ost->tempFrame = allocateFrame(
+            AV_PIX_FMT_RGB24,
+            settings.inputWidth,
+            settings.inputHeight);
 
-        if (ost->tempFrame == nullptr) {
-            return Error::CouldNotAllocateFrame;
-        }
+    if (ost->tempFrame == nullptr) {
+        return Error::CouldNotAllocateFrame;
     }
 
     if (avcodec_parameters_from_context(
@@ -191,20 +219,18 @@ atg_dtv::Encoder::Error openVideo(
         return Error::CouldNotCopyStreamParameters;
     }
 
-    if (ost->codecContext->pix_fmt != AV_PIX_FMT_RGBA) {
-        ost->swsContext = sws_getContext(
-                ost->codecContext->width, ost->codecContext->height,
-                AV_PIX_FMT_RGBA,
-                ost->codecContext->width, ost->codecContext->height,
-                ost->codecContext->pix_fmt,
-                SWS_BICUBIC,
-                nullptr,
-                nullptr,
-                nullptr);
+    ost->swsContext = sws_getContext(
+            settings.inputWidth, settings.inputHeight,
+            AV_PIX_FMT_RGB24,
+            ost->codecContext->width, ost->codecContext->height,
+            ost->codecContext->pix_fmt,
+            SWS_BICUBIC,
+            nullptr,
+            nullptr,
+            nullptr);
 
-        if (ost->swsContext == nullptr) {
-            return Error::CouldNotCreateConversionContext;
-        }
+    if (ost->swsContext == nullptr) {
+        return Error::CouldNotCreateConversionContext;
     }
 
     return Error::None;
@@ -216,26 +242,12 @@ void generateFrame(
         atg_dtv::Encoder::VideoSettings &settings,
         OutputStream *ost)
 {
-    AVFrame *target = (ost->swsContext != nullptr)
-        ? ost->tempFrame
-        : ost->frame;
+    AVFrame *target = ost->tempFrame;
 
-    for (int i = 0; i < settings.height; ++i) {
-        for (int j = 0; j < settings.width; ++j) {
-            const bool inBounds = (i < src->m_height && j < src->m_width);
-
-            target->data[0][i * target->linesize[0] + j * 4 + 0] = (inBounds)
-                ? src->m_rgb[(i * src->m_width + j) * 3 + 0]
-                : 0;
-            target->data[0][i * target->linesize[0] + j * 4 + 1] = (inBounds)
-                ? src->m_rgb[(i * src->m_width + j) * 3 + 1]
-                : 0;
-            target->data[0][i * target->linesize[0] + j * 4 + 2] = (inBounds)
-                ? src->m_rgb[(i * src->m_width + j) * 3 + 2]
-                : 0;
-            target->data[0][i * target->linesize[0] + j * 4 + 3] = 255;
-        }
-    }
+    memcpy(
+        target->data[0],
+        src->m_rgb,
+        (size_t)src->m_width * src->m_height * 3 * sizeof(uint8_t));
 
     if (ost->swsContext != nullptr) {
         sws_scale(
@@ -243,7 +255,7 @@ void generateFrame(
                 (const uint8_t *const *)ost->tempFrame->data,
                 ost->tempFrame->linesize,
                 0,
-                ost->codecContext->height,
+                settings.inputHeight,
                 ost->frame->data,
                 ost->frame->linesize);
     }
@@ -264,9 +276,8 @@ atg_dtv::Encoder::Error writeFrame(
         return Error::CouldNotSendFrameToEncoder;
     }
 
-    int r = 0;
-    while (r >= 0) {
-        r = avcodec_receive_packet(codecContext, packet);
+    while (true) {
+        const int r = avcodec_receive_packet(codecContext, packet);
         if (r == AVERROR(EAGAIN) || r == AVERROR_EOF) break;
         else if (r < 0) {
             return Error::CouldNotEncodeFrame;
@@ -280,8 +291,6 @@ atg_dtv::Encoder::Error writeFrame(
         }
     }
 
-    constexpr int a = AVERROR_EOF;
-
     return Error::None;
 }
 
@@ -293,6 +302,7 @@ void atg_dtv::Encoder::worker() {
     AVCodec *videoCodec = nullptr;
     OutputStream videoStream;
     bool openedFile = false;
+
     avformat_alloc_output_context2(
             &oc,
             nullptr,
@@ -314,12 +324,10 @@ void atg_dtv::Encoder::worker() {
         goto end;
     }
 
-    err = openVideo(oc, videoCodec, &videoStream);
+    err = openVideo(oc, videoCodec, &videoStream, m_videoSettings);
     if (err != Error::None) {
         goto end;
     }
-
-    av_dump_format(oc, 0, m_videoSettings.fname.c_str(), 1);
 
     if ((fmt->flags & AVFMT_NOFILE) == 0) {
         if (avio_open(&oc->pb, m_videoSettings.fname.c_str(), AVIO_FLAG_WRITE) < 0) {
@@ -337,12 +345,6 @@ void atg_dtv::Encoder::worker() {
     }
 
     while (true) {
-        bool complete = false;
-        {
-            std::lock_guard<std::mutex> lk(m_lock);
-            complete = m_stopped;
-        }
-
         Frame *frame = m_queue.waitFrame();
         if (frame != nullptr) {
             generateFrame(frame, videoStream.frame, m_videoSettings, &videoStream);
@@ -357,7 +359,10 @@ void atg_dtv::Encoder::worker() {
 
             if (err != Error::None) goto end;
         }
-        else if (complete) break;
+        else {
+            std::lock_guard<std::mutex> lk(m_lock);
+            if (m_stopped) break;
+        }
     }
 
     av_write_trailer(oc);
@@ -365,6 +370,7 @@ void atg_dtv::Encoder::worker() {
 end:
     std::lock_guard<std::mutex> lk(m_lock);
     m_error = err;
+    m_stopped = true;
 
     freeStream(&videoStream);
 

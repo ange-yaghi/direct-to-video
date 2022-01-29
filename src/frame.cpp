@@ -5,6 +5,8 @@
 atg_dtv::Frame::Frame() {
     m_rgb = nullptr;
     m_width = m_height = 0;
+    m_maxHeight = 0;
+    m_maxWidth = 0;
 }
 
 atg_dtv::Frame::~Frame() {

@@ -29,6 +29,7 @@ void atg_dtv::FrameQueue::destroy() {
 
     for (int i = 0; i < m_capacity; ++i) {
         delete[] m_frames[i].m_rgb;
+        m_frames[i].m_rgb = nullptr;
     }
 
     delete[] m_frames;
