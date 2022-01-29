@@ -30,7 +30,7 @@ add_executable(direct-to-video-demo
     demo/src/main.cpp
 
     # Include files
-    include/dtv.h
+    demo/include/dtv.h
 )
 
 target_include_directories(direct-to-video PUBLIC
