@@ -1,5 +1,7 @@
 # Direct to Video (DTV)
 
+![Alt text](docs/public/dtv_banner.png?raw=true)
+
 ## What does DTV do?
 DTV is a library that provides a simple interface for generating video files from a C++ application. It uses FFmpeg which means that it supports the same encoders and performance that you would get from something like OBS. Unlike OBS, however, it is not dependent on the input being delivered in real-time. This means that regardless of the input frequency to DTV, the output will always be at the frame rate that you select.
 
