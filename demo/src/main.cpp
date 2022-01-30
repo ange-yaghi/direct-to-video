@@ -23,7 +23,7 @@ int main() {
     settings.hardwareEncoding = true;
     settings.bitRate = 16000000;
 
-    const int VideoLengthSeconds = 60;
+    const int VideoLengthSeconds = 10;
     const int FrameCount = VideoLengthSeconds * settings.frameRate;
 
     auto start = std::chrono::steady_clock::now();

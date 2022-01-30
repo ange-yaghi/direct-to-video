@@ -53,7 +53,11 @@ void atg_dtv::Encoder::stop() {
 }
 
 atg_dtv::Frame *atg_dtv::Encoder::newFrame(bool wait) {
-    return m_queue.newFrame(m_videoSettings.inputWidth, m_videoSettings.inputHeight, wait);
+    return m_queue.newFrame(
+        m_videoSettings.inputWidth,
+        m_videoSettings.inputHeight,
+        m_videoSettings.inputAlpha,
+        wait);
 }
 
 void atg_dtv::Encoder::submitFrame() {
@@ -204,7 +208,9 @@ atg_dtv::Encoder::Error openVideo(
     }
 
     ost->tempFrame = allocateFrame(
-            AV_PIX_FMT_RGB24,
+            (settings.inputAlpha)
+                ? AV_PIX_FMT_RGBA
+                : AV_PIX_FMT_RGB24,
             settings.inputWidth,
             settings.inputHeight);
 
@@ -221,7 +227,9 @@ atg_dtv::Encoder::Error openVideo(
 
     ost->swsContext = sws_getContext(
             settings.inputWidth, settings.inputHeight,
-            AV_PIX_FMT_RGB24,
+            (settings.inputAlpha)
+                ? AV_PIX_FMT_RGBA
+                : AV_PIX_FMT_RGB24,
             ost->codecContext->width, ost->codecContext->height,
             ost->codecContext->pix_fmt,
             SWS_BICUBIC,
@@ -244,10 +252,13 @@ void generateFrame(
 {
     AVFrame *target = ost->tempFrame;
 
+    const int pixelSize = settings.inputAlpha
+        ? 4 * sizeof(uint8_t)
+        : 3 * sizeof(uint8_t);
     memcpy(
         target->data[0],
         src->m_rgb,
-        (size_t)src->m_width * src->m_height * 3 * sizeof(uint8_t));
+        (size_t)src->m_width * src->m_height * pixelSize);
 
     if (ost->swsContext != nullptr) {
         sws_scale(

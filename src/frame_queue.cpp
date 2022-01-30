@@ -40,7 +40,7 @@ void atg_dtv::FrameQueue::destroy() {
     m_readIndex = 0;
 }
 
-atg_dtv::Frame *atg_dtv::FrameQueue::newFrame(int width, int height, bool wait) {
+atg_dtv::Frame *atg_dtv::FrameQueue::newFrame(int width, int height, bool alpha, bool wait) {
     std::unique_lock<std::mutex> lk(m_lock);
 
     if (wait) {
@@ -56,7 +56,11 @@ atg_dtv::Frame *atg_dtv::FrameQueue::newFrame(int width, int height, bool wait) 
     }
 
     if (f.m_rgb == nullptr) {
-        f.m_rgb = new uint8_t[width * height * 3];
+        const int pixelSize = (alpha)
+            ? 4
+            : 3;
+
+        f.m_rgb = new uint8_t[(size_t)width * height * pixelSize];
         f.m_maxWidth = width;
         f.m_maxHeight = height;
     }

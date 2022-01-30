@@ -15,7 +15,7 @@ namespace atg_dtv {
             void initialize(int size);
             void destroy();
 
-            Frame *newFrame(int width, int height, bool wait = false);
+            Frame *newFrame(int width, int height, bool alpha, bool wait = false);
             void submitFrame();
             Frame *waitFrame();
             void popFrame();

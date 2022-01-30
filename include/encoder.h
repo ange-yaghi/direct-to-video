@@ -10,14 +10,15 @@ namespace atg_dtv {
     class Encoder {
         public:
             struct VideoSettings {
-                std::string fname = "";
-                bool hardwareEncoding = true;
+                std::string fname = ""; 
                 int width = 1920;
                 int height = 1080;
                 int inputWidth = 1920;
                 int inputHeight = 1080;
                 int frameRate = 60;
                 int bitRate = 30000000;
+                bool hardwareEncoding = true;
+                bool inputAlpha = false;
             };
 
             enum class Error {
