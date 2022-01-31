@@ -1,4 +1,3 @@
-#include "..\include\encoder.h"
 #include "../include/encoder.h"
 
 #include "../include/ffmpeg.h"
