@@ -6,7 +6,30 @@
 #include <thread>
 #include <mutex>
 
+struct AVStream;
+struct AVCodecContext;
+struct AVFrame;
+struct AVPacket;
+struct SwsContext;
+struct SwrContext;
+struct AVFormatContext;
+struct AVOutputFormat;
+struct AVCodec;
+
 namespace atg_dtv {
+    struct OutputStream {
+        AVStream *av_stream = nullptr;
+        AVCodecContext *codecContext = nullptr;
+
+        int64_t nextPts = 0;
+
+        AVFrame *frame = nullptr, *tempFrame = nullptr;
+        AVPacket *tempPacket = nullptr;
+
+        SwsContext *swsContext = nullptr;
+        SwrContext *swrContext = nullptr;
+    };
+
     class Encoder {
         public:
             struct VideoSettings {
@@ -54,12 +77,21 @@ namespace atg_dtv {
             Error getError();
 
         protected:
+            void setup();
             void worker();
+            void destroy();
 
         protected:
             std::thread *m_worker;
             std::mutex m_lock;
             Error m_error;
+
+            AVFormatContext *m_oc = nullptr;
+            AVOutputFormat *m_fmt = nullptr;
+            AVCodec *m_videoCodec = nullptr;
+            OutputStream m_videoStream;
+            bool m_openedFile = false;
+            int m_lineWidth = 0;
 
         protected:
             FrameQueue m_queue;

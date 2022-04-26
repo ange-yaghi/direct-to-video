@@ -25,7 +25,14 @@ void atg_dtv::Encoder::run(
 
     m_queue.initialize(bufferSize);
 
-    m_worker = new std::thread(&atg_dtv::Encoder::worker, this);
+    setup();
+
+    if (m_error == Error::None) {
+        m_worker = new std::thread(&atg_dtv::Encoder::worker, this);
+    }
+    else {
+        destroy();
+    }
 }
 
 atg_dtv::Encoder::Error atg_dtv::Encoder::getError() {
@@ -55,7 +62,7 @@ atg_dtv::Frame *atg_dtv::Encoder::newFrame(bool wait) {
     return m_queue.newFrame(
         m_videoSettings.inputWidth,
         m_videoSettings.inputHeight,
-        m_videoSettings.inputAlpha,
+        m_lineWidth,
         wait);
 }
 
@@ -63,21 +70,8 @@ void atg_dtv::Encoder::submitFrame() {
     m_queue.submitFrame();
 }
 
-struct OutputStream {
-    AVStream *av_stream = nullptr;
-    AVCodecContext *codecContext = nullptr;
-
-    int64_t nextPts = 0;
-
-    AVFrame *frame = nullptr, *tempFrame = nullptr;
-    AVPacket *tempPacket = nullptr;
-
-    SwsContext *swsContext = nullptr;
-    SwrContext *swrContext = nullptr;
-};
-
 atg_dtv::Encoder::Error addStream(
-        OutputStream *ost,
+        atg_dtv::OutputStream *ost,
         AVFormatContext *oc,
         AVCodec **codec,
         AVCodecID codecId,
@@ -157,7 +151,7 @@ atg_dtv::Encoder::Error addStream(
     return Error::None;
 }
 
-void freeStream(OutputStream *ost) {
+void freeStream(atg_dtv::OutputStream *ost) {
     if (ost->codecContext != nullptr) avcodec_free_context(&ost->codecContext);
     if (ost->frame != nullptr) av_frame_free(&ost->frame);
     if (ost->tempFrame != nullptr) av_frame_free(&ost->tempFrame);
@@ -188,7 +182,7 @@ AVFrame *allocateFrame(
 atg_dtv::Encoder::Error openVideo(
         AVFormatContext *oc,
         const AVCodec *codec,
-        OutputStream *ost,
+        atg_dtv::OutputStream *ost,
         atg_dtv::Encoder::VideoSettings &settings)
 {
     typedef atg_dtv::Encoder::Error Error;
@@ -247,7 +241,7 @@ void generateFrame(
         atg_dtv::Frame *src,
         AVFrame *dest,
         atg_dtv::Encoder::VideoSettings &settings,
-        OutputStream *ost)
+        atg_dtv::OutputStream *ost)
 {
     AVFrame *target = ost->tempFrame;
 
@@ -304,66 +298,67 @@ atg_dtv::Encoder::Error writeFrame(
     return Error::None;
 }
 
-void atg_dtv::Encoder::worker() {
+void atg_dtv::Encoder::setup() {
     Error err = Error::None;
 
-    AVFormatContext *oc = nullptr;
-    AVOutputFormat *fmt;
-    AVCodec *videoCodec = nullptr;
-    OutputStream videoStream;
-    bool openedFile = false;
-
     avformat_alloc_output_context2(
-            &oc,
-            nullptr,
-            nullptr,
-            m_videoSettings.fname.c_str());
+        &m_oc,
+        nullptr,
+        nullptr,
+        m_videoSettings.fname.c_str());
 
-    if (oc == nullptr) {
-        err = Error::CouldNotAllocateOutputContext;
-        goto end;
+    if (m_oc == nullptr) {
+        m_error = Error::CouldNotAllocateOutputContext;
+        return;
     }
 
-    fmt = oc->oformat;
+    m_fmt = m_oc->oformat;
 
-    if (fmt->video_codec != AV_CODEC_ID_NONE) {
-        addStream(&videoStream, oc, &videoCodec, fmt->video_codec, m_videoSettings);
+    if (m_fmt->video_codec != AV_CODEC_ID_NONE) {
+        addStream(&m_videoStream, m_oc, &m_videoCodec, m_fmt->video_codec, m_videoSettings);
     }
     else {
-        err = Error::NotAVideoFormat;
-        goto end;
+        m_error = Error::NotAVideoFormat;
+        return;
     }
 
-    err = openVideo(oc, videoCodec, &videoStream, m_videoSettings);
+    err = openVideo(m_oc, m_videoCodec, &m_videoStream, m_videoSettings);
     if (err != Error::None) {
-        goto end;
+        m_error = err;
+        return;
     }
 
-    if ((fmt->flags & AVFMT_NOFILE) == 0) {
-        if (avio_open(&oc->pb, m_videoSettings.fname.c_str(), AVIO_FLAG_WRITE) < 0) {
-            err = Error::CouldNotOpenFile;
-            goto end;
+    if ((m_fmt->flags & AVFMT_NOFILE) == 0) {
+        if (avio_open(&m_oc->pb, m_videoSettings.fname.c_str(), AVIO_FLAG_WRITE) < 0) {
+            m_error = Error::CouldNotOpenFile;
+            return;
         }
         else {
-            openedFile = true;
+            m_openedFile = true;
         }
     }
 
-    if (avformat_write_header(oc, nullptr) < 0) {
-        err = Error::CouldNotWriteHeader;
-        goto end;
+    if (avformat_write_header(m_oc, nullptr) < 0) {
+        m_error = Error::CouldNotWriteHeader;
+        return;
     }
+
+    m_lineWidth = m_videoStream.tempFrame->linesize[0];
+}
+
+void atg_dtv::Encoder::worker() {
+    Error err = Error::None;
 
     while (true) {
         Frame *frame = m_queue.waitFrame();
         if (frame != nullptr) {
-            generateFrame(frame, videoStream.frame, m_videoSettings, &videoStream);
+            generateFrame(frame, m_videoStream.frame, m_videoSettings, &m_videoStream);
             err = writeFrame(
-                    oc,
-                    videoStream.codecContext,
-                    videoStream.av_stream,
-                    videoStream.frame,
-                    videoStream.tempPacket);
+                    m_oc,
+                    m_videoStream.codecContext,
+                    m_videoStream.av_stream,
+                    m_videoStream.frame,
+                    m_videoStream.tempPacket);
 
             m_queue.popFrame();
 
@@ -375,20 +370,24 @@ void atg_dtv::Encoder::worker() {
         }
     }
 
-    av_write_trailer(oc);
+    av_write_trailer(m_oc);
 
 end:
     std::lock_guard<std::mutex> lk(m_lock);
     m_error = err;
     m_stopped = true;
 
-    freeStream(&videoStream);
+    m_queue.stop();
 
-    if (openedFile) {
-        avio_closep(&oc->pb);
+    destroy();
+}
+
+void atg_dtv::Encoder::destroy() {
+    freeStream(&m_videoStream);
+
+    if (m_openedFile) {
+        avio_closep(&m_oc->pb);
     }
 
-    if (oc != nullptr) avformat_free_context(oc);
-
-    m_queue.stop();
+    if (m_oc != nullptr) avformat_free_context(m_oc);
 }

@@ -12,6 +12,7 @@ namespace atg_dtv {
             uint8_t *m_rgb;
             int m_width, m_height;
             int m_maxWidth, m_maxHeight;
+            int m_lineWidth;
     };
 }  /* namespace atg_dtv */
 

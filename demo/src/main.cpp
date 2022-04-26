@@ -44,7 +44,7 @@ int main() {
         if (frame == nullptr) break;
         if (encoder.getError() != atg_dtv::Encoder::Error::None) break;
 
-        const int lineWidth = settings.inputWidth * 3;
+        const int lineWidth = frame->m_lineWidth;
         for (int y = 0; y < settings.inputHeight; ++y) {
             uint8_t *row = &frame->m_rgb[y * lineWidth];
             for (int x = 0; x < settings.inputWidth; ++x) {
