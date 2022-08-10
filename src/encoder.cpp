@@ -73,7 +73,7 @@ void atg_dtv::Encoder::submitFrame() {
 atg_dtv::Encoder::Error addStream(
         atg_dtv::OutputStream *ost,
         AVFormatContext *oc,
-        AVCodec **codec,
+        const AVCodec **codec,
         AVCodecID codecId,
         atg_dtv::Encoder::VideoSettings &settings)
 {
