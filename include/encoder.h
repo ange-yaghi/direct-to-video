@@ -87,8 +87,8 @@ namespace atg_dtv {
             Error m_error;
 
             AVFormatContext *m_oc = nullptr;
-            AVOutputFormat *m_fmt = nullptr;
-            AVCodec *m_videoCodec = nullptr;
+            const AVOutputFormat *m_fmt = nullptr;
+            const AVCodec *m_videoCodec = nullptr;
             OutputStream m_videoStream;
             bool m_openedFile = false;
             int m_lineWidth = 0;
