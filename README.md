@@ -17,7 +17,7 @@ Check out the sample application that is provided with DTV. The interface is ext
 7. Call ```encoder.stop()``` which will wait until the encoder finishes encoding buffered frames and then for the encoder thread to exit.
 
 ## How do I build it?
-You will need to have FFmpeg development libraries installed on your computer and the directory listed on your PATH. DTV has only been tested on Windows but in principle should build on other platforms. The cmake script that searches for FFmpeg libraries, however, is Windows specific and you'll have to modify ```cmake/FindFFmpeg.cmake``` to work for other platforms. (If you do this, please create a pull-request!)
+You will need to have FFmpeg development libraries installed on your computer and the directory listed on your PATH. DTV has only been tested on Windows but in principle should build on other platforms. The cmake script that searches for FFmpeg libraries, however, is Windows/Linux specific and you'll have to modify ```cmake/FindFFmpeg.cmake``` to work for other platforms. (If you do this, please create a pull-request!)
 
 For FFmpeg pre-built binaries, see the [OBS installation instructions](https://github.com/obsproject/obs-studio/wiki/Install-Instructions) page.
 
