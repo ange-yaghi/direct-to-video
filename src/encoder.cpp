@@ -73,7 +73,7 @@ void atg_dtv::Encoder::submitFrame() {
 atg_dtv::Encoder::Error addStream(
         atg_dtv::OutputStream *ost,
         AVFormatContext *oc,
-        AVCodec **codec,
+        const AVCodec **codec,
         AVCodecID codecId,
         atg_dtv::Encoder::VideoSettings &settings)
 {
@@ -185,6 +185,7 @@ atg_dtv::Encoder::Error openVideo(
         atg_dtv::OutputStream *ost,
         atg_dtv::Encoder::VideoSettings &settings)
 {
+	(void)oc;
     typedef atg_dtv::Encoder::Error Error;
 
     if (avcodec_open2(ost->codecContext, codec, nullptr) < 0) {
@@ -244,6 +245,7 @@ void generateFrame(
         atg_dtv::OutputStream *ost)
 {
     AVFrame *target = ost->tempFrame;
+	(void)dest;
 
     const int pixelSize = settings.inputAlpha
         ? 4 * sizeof(uint8_t)
