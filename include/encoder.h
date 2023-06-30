@@ -5,6 +5,7 @@
 
 #include <thread>
 #include <mutex>
+#include <string>
 
 struct AVStream;
 struct AVCodecContext;
