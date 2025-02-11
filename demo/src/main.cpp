@@ -1,8 +1,8 @@
 #include "../include/dtv.h"
 
-#include <iostream>
 #include <chrono>
 #include <cmath>
+#include <iostream>
 
 int main() {
     atg_dtv::Encoder encoder;
@@ -26,7 +26,7 @@ int main() {
     const int VideoLengthSeconds = 10;
     const int FrameCount = VideoLengthSeconds * settings.frameRate;
 
-    auto start = std::chrono::steady_clock::now();
+    const auto start = std::chrono::steady_clock::now();
 
     std::cout << "==============================================\n";
     std::cout << " Direct to Video (DTV) Sample Application\n\n";
@@ -41,17 +41,17 @@ int main() {
         const int sin_i = std::lroundf(255 * (0.5 + 0.5 * std::sin(i * 0.01)));
 
         atg_dtv::Frame *frame = encoder.newFrame(true);
-        if (frame == nullptr) break;
-        if (encoder.getError() != atg_dtv::Encoder::Error::None) break;
+        if (frame == nullptr) { break; }
+        if (encoder.getError() != atg_dtv::Encoder::Error::None) { break; }
 
         const int lineWidth = frame->m_lineWidth;
         for (int y = 0; y < settings.inputHeight; ++y) {
             uint8_t *row = &frame->m_rgb[y * lineWidth];
             for (int x = 0; x < settings.inputWidth; ++x) {
                 const int index = x * 3;
-                row[index + 0] = (x + i) & 0xFF; // r
-                row[index + 1] = (y + i) & 0xFF; // g
-                row[index + 2] = sin_i & 0xFF;   // b
+                row[index + 0] = (x + i) & 0xFF;// r
+                row[index + 1] = (y + i) & 0xFF;// g
+                row[index + 2] = sin_i & 0xFF;  // b
             }
         }
 
@@ -61,17 +61,18 @@ int main() {
     encoder.commit();
     encoder.stop();
 
-    auto end = std::chrono::steady_clock::now();
-
+    const auto end = std::chrono::steady_clock::now();
     const double elapsedSeconds =
-        std::chrono::duration<double>(end - start).count();
+            std::chrono::duration<double>(end - start).count();
 
     std::cout << "==============================================\n";
-    if (encoder.getError() == atg_dtv::Encoder::Error::None) {      
-        std::cout << "Encoding took: " << elapsedSeconds << " seconds" << "\n";
-        std::cout << "Real-time framerate: " << FrameCount / elapsedSeconds << " FPS" << "\n";
-    }
-    else {
+    if (encoder.getError() == atg_dtv::Encoder::Error::None) {
+        std::cout << "Encoding took: " << elapsedSeconds << " seconds"
+                  << "\n";
+        std::cout << "Real-time framerate: " << FrameCount / elapsedSeconds
+                  << " FPS"
+                  << "\n";
+    } else {
         std::cout << "Encoding failed\n";
     }
 }

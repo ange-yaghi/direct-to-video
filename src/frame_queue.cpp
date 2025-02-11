@@ -10,9 +10,7 @@ atg_dtv::FrameQueue::FrameQueue() {
     m_stopped = false;
 }
 
-atg_dtv::FrameQueue::~FrameQueue() {
-    assert(m_frames == nullptr);
-}
+atg_dtv::FrameQueue::~FrameQueue() { assert(m_frames == nullptr); }
 
 void atg_dtv::FrameQueue::initialize(int size) {
     assert(m_frames == nullptr);
@@ -25,7 +23,7 @@ void atg_dtv::FrameQueue::initialize(int size) {
 }
 
 void atg_dtv::FrameQueue::destroy() {
-    if (m_frames == nullptr) return;
+    if (m_frames == nullptr) { return; }
 
     for (int i = 0; i < m_capacity; ++i) {
         delete[] m_frames[i].m_rgb;
@@ -40,14 +38,15 @@ void atg_dtv::FrameQueue::destroy() {
     m_readIndex = 0;
 }
 
-atg_dtv::Frame *atg_dtv::FrameQueue::newFrame(int width, int height, int lineWidth, bool wait) {
+atg_dtv::Frame *atg_dtv::FrameQueue::newFrame(int width, int height,
+                                              int lineWidth, bool wait) {
     std::unique_lock<std::mutex> lk(m_lock);
 
     if (wait) {
-        m_cv.wait(lk, [this]{ return m_length < m_capacity || m_stopped; });
+        m_cv.wait(lk, [this] { return m_length < m_capacity || m_stopped; });
     }
-    
-    if (m_length == m_capacity) return nullptr;
+
+    if (m_length == m_capacity) { return nullptr; }
 
     Frame &f = m_frames[(m_readIndex + m_length) % m_capacity];
     if (f.m_maxHeight < height || f.m_maxWidth < width) {
@@ -56,7 +55,7 @@ atg_dtv::Frame *atg_dtv::FrameQueue::newFrame(int width, int height, int lineWid
     }
 
     if (f.m_rgb == nullptr) {
-        f.m_rgb = new uint8_t[(size_t)height * lineWidth];
+        f.m_rgb = new uint8_t[(size_t) height * lineWidth];
         f.m_maxWidth = width;
         f.m_maxHeight = height;
         f.m_lineWidth = lineWidth;
@@ -81,7 +80,9 @@ void atg_dtv::FrameQueue::submitFrame() {
 
 atg_dtv::Frame *atg_dtv::FrameQueue::waitFrame() {
     std::unique_lock<std::mutex> lk(m_lock);
-    m_cv.wait(lk, [this]{ return this->m_length > 0 || (m_stopped && this->m_length == 0); });
+    m_cv.wait(lk, [this] {
+        return this->m_length > 0 || (m_stopped && this->m_length == 0);
+    });
 
     if (this->m_length == 0) return nullptr;
 
