@@ -67,7 +67,7 @@ int main() {
 
     std::cout << "==============================================\n";
     if (encoder.getError() == atg_dtv::Encoder::Error::None) {
-        std::cout << "Encoding took: " << elapsedSeconds << " seconds"
+        std::cout << "Encoding time: " << elapsedSeconds << " seconds"
                   << "\n";
         std::cout << "Real-time framerate: " << FrameCount / elapsedSeconds
                   << " FPS"
