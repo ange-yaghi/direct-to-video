@@ -104,7 +104,7 @@ atg_dtv::Encoder::Error addStream(atg_dtv::OutputStream *ost,
             codecContext->width = settings.width;
             codecContext->height = settings.height;
 
-            ost->av_stream->time_base = {1, settings.frameRate};
+            ost->av_stream->time_base = AVRational{1, settings.frameRate};
             codecContext->time_base = ost->av_stream->time_base;
 
             codecContext->gop_size = 12;
