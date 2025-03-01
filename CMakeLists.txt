@@ -18,11 +18,11 @@ add_library(direct-to-video
     src/encoder.cpp
 
     # Include files
-    include/frame.h
-    include/ffmpeg.h
-    include/frame_queue.h
-    include/encoder.h
-    include/dtv.h
+    include/dtv/frame.h
+    include/dtv/ffmpeg.h
+    include/dtv/frame_queue.h
+    include/dtv/encoder.h
+    include/dtv/dtv.h
 )
 
 add_executable(direct-to-video-demo
@@ -31,6 +31,10 @@ add_executable(direct-to-video-demo
 
     # Include files
     demo/include/dtv.h
+)
+
+target_include_directories(direct-to-video INTERFACE
+    include/
 )
 
 target_include_directories(direct-to-video PUBLIC

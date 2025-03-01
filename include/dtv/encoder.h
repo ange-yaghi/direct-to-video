@@ -77,6 +77,8 @@ public:
     void submitFrame();
     Error getError();
 
+    inline bool running() const { return !m_stopped; }
+
 private:
     void setup();
     void worker();

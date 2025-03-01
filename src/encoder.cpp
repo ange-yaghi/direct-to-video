@@ -1,6 +1,6 @@
-#include "../include/encoder.h"
+#include "../include/dtv/encoder.h"
 
-#include "../include/ffmpeg.h"
+#include "../include/dtv/ffmpeg.h"
 
 atg_dtv::Encoder::Encoder() {
     m_stopped = true;
