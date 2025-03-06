@@ -23,6 +23,8 @@ struct OutputStream {
     AVCodecContext *codecContext = nullptr;
 
     int64_t nextPts = 0;
+    int64_t writePts = 0;
+    int64_t audioSamples = 0;
 
     AVFrame *frame = nullptr, *tempFrame = nullptr;
     AVPacket *tempPacket = nullptr;
@@ -41,8 +43,10 @@ public:
         int inputHeight = 1080;
         int frameRate = 60;
         int bitRate = 30000000;
+        bool audio = false;
         bool hardwareEncoding = true;
         bool inputAlpha = false;
+        bool bgr = false;
     };
 
     enum class Error {
@@ -63,7 +67,8 @@ public:
         CouldNotCreateConversionContext,
         CouldNotSendFrameToEncoder,
         CouldNotEncodeFrame,
-        CouldNotWriteOutputPacket
+        CouldNotWriteOutputPacket,
+        CouldNotCreateResamplerContext,
     };
 
 public:
@@ -91,8 +96,8 @@ private:
 
     AVFormatContext *m_oc = nullptr;
     const AVOutputFormat *m_fmt = nullptr;
-    const AVCodec *m_videoCodec = nullptr;
-    OutputStream m_videoStream;
+    const AVCodec *m_videoCodec = nullptr, *m_audioCodec = nullptr;
+    OutputStream m_videoStream, m_audioStream;
     bool m_openedFile = false;
     int m_lineWidth = 0;
 

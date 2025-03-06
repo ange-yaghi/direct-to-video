@@ -15,7 +15,8 @@ public:
     void initialize(int size);
     void destroy();
 
-    Frame *newFrame(int width, int height, int lineWidth, bool wait = false);
+    Frame *newFrame(int width, int height, int lineWidth, int audioSamples,
+                    int audioChannels, bool wait = false);
     void submitFrame();
     Frame *waitFrame();
     void popFrame();

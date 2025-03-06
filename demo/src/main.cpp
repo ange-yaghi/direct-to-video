@@ -23,6 +23,9 @@ int main() {
     settings.hardwareEncoding = true;
     settings.bitRate = 16000000;
 
+    // Audio settings
+    settings.audio = true;
+
     const int VideoLengthSeconds = 10;
     const int FrameCount = VideoLengthSeconds * settings.frameRate;
 
@@ -33,6 +36,7 @@ int main() {
 
     encoder.run(settings, 2);
 
+    int audioSample = 0;
     for (int i = 0; i < FrameCount; ++i) {
         if ((i + 1) % 100 == 0 || i >= FrameCount - 10) {
             std::cout << "Frame: " << (i + 1) << "/" << FrameCount << "\n";
@@ -53,6 +57,15 @@ int main() {
                 row[index + 1] = (y + i) & 0xFF;// g
                 row[index + 2] = sin_i & 0xFF;  // b
             }
+        }
+
+        for (int i_aud = 0; i_aud < frame->m_audioSamples;
+             ++i_aud, ++audioSample) {
+            const double aud_t = audioSample / 44100.0;
+            const double v = std::sin(aud_t * 1000) * 0.9;
+            const int v_i = std::round(v * INT16_MAX);
+            frame->m_audio[i_aud * 2 + 0] = 10000;
+            frame->m_audio[i_aud * 2 + 1] = v_i;
         }
 
         encoder.submitFrame();

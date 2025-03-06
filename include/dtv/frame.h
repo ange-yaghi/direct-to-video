@@ -13,6 +13,10 @@ public:
     int m_width, m_height;
     int m_maxWidth, m_maxHeight;
     int m_lineWidth;
+
+    int16_t *m_audio;
+    int m_audioCapacity;
+    int m_audioSamples;
 };
 } /* namespace atg_dtv */
 

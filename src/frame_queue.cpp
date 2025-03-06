@@ -28,6 +28,9 @@ void atg_dtv::FrameQueue::destroy() {
     for (int i = 0; i < m_capacity; ++i) {
         delete[] m_frames[i].m_rgb;
         m_frames[i].m_rgb = nullptr;
+
+        delete[] m_frames[i].m_audio;
+        m_frames[i].m_audio = nullptr;
     }
 
     delete[] m_frames;
@@ -39,7 +42,8 @@ void atg_dtv::FrameQueue::destroy() {
 }
 
 atg_dtv::Frame *atg_dtv::FrameQueue::newFrame(int width, int height,
-                                              int lineWidth, bool wait) {
+                                              int lineWidth, int audioSamples,
+                                              int audioChannels, bool wait) {
     std::unique_lock<std::mutex> lk(m_lock);
 
     if (wait) {
@@ -55,12 +59,24 @@ atg_dtv::Frame *atg_dtv::FrameQueue::newFrame(int width, int height,
     }
 
     if (f.m_rgb == nullptr) {
-        f.m_rgb = new uint8_t[(size_t) height * lineWidth];
+        f.m_rgb = new uint8_t[size_t(height) * size_t(lineWidth)];
         f.m_maxWidth = width;
         f.m_maxHeight = height;
         f.m_lineWidth = lineWidth;
     }
 
+    const int totalAudioSamples = audioSamples * audioChannels;
+    if (totalAudioSamples > f.m_audioCapacity) {
+        if (f.m_audio != nullptr) { delete[] f.m_audio; }
+    }
+
+    if (f.m_audio == nullptr && totalAudioSamples != 0) {
+        f.m_audio = new int16_t[size_t(totalAudioSamples)];
+        f.m_audioCapacity = totalAudioSamples;
+        memset(f.m_audio, 0, sizeof(int16_t) * size_t(totalAudioSamples));
+    }
+
+    f.m_audioSamples = audioSamples;
     f.m_width = width;
     f.m_height = height;
 
