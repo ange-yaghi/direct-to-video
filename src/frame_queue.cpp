@@ -18,6 +18,7 @@ void atg_dtv::FrameQueue::initialize(int size) {
     m_capacity = size;
     m_length = 0;
     m_readIndex = 0;
+    m_stopped = false;
 
     m_frames = new Frame[m_capacity];
 }
@@ -34,8 +35,8 @@ void atg_dtv::FrameQueue::destroy() {
     }
 
     delete[] m_frames;
-
     m_frames = nullptr;
+
     m_capacity = 0;
     m_length = 0;
     m_readIndex = 0;
@@ -100,7 +101,7 @@ atg_dtv::Frame *atg_dtv::FrameQueue::waitFrame() {
         return this->m_length > 0 || (m_stopped && this->m_length == 0);
     });
 
-    if (this->m_length == 0) return nullptr;
+    if (this->m_length == 0) { return nullptr; }
 
     Frame &f = m_frames[m_readIndex];
 
