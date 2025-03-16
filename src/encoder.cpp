@@ -119,7 +119,7 @@ atg_dtv::Encoder::Error addStream(atg_dtv::OutputStream *ost,
             codecContext->sample_fmt = (*codec)->sample_fmts
                                                ? (*codec)->sample_fmts[0]
                                                : AV_SAMPLE_FMT_FLTP;
-            codecContext->bit_rate = 64000;
+            codecContext->bit_rate = 256000;
             codecContext->sample_rate = 44100;
             if ((*codec)->supported_samplerates) {
                 codecContext->sample_rate = (*codec)->supported_samplerates[0];
